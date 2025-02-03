@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // User-specific rules
+    match /users/{userId} {
+      // Allow users to read and write their own data
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Allow coaches to read only players assigned to them
+      allow read: if request.auth != null && (
+        resource.data.role == "player" && resource.data.coachId == request.auth.uid
+      );
+    }
+
+    // Group-specific rules
+    match /groups/{groupId} {
+      // Allow coaches to create and manage groups
+      allow create, read, update, delete: if request.auth != null &&
+        get(/databases/{database}/documents/users/{request.auth.uid}).data.role == "coach";
+
+      // Allow players to read group data if they are part of the group
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+    }
+
+    // Training-specific rules
+    match /trainings/{trainingId} {
+      // Allow coaches to create, read, update, and delete their own trainings
+      allow create, read, update, delete: if request.auth != null &&
+        resource.data.coachId == request.auth.uid;
+    }
+
+    // Rating-specific rules
+    match /ratings/{ratingId} {
+      // Allow players to create ratings for trainings
+      allow create: if request.auth != null &&
+        get(/databases/{database}/documents/users/{request.auth.uid}).data.role == "player";
+
+      // Allow both players and coaches to read ratings
+      allow read: if request.auth != null;
+    }
+  }
+}
